@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+https://go.microsoft.com/fwlink/?LinkID=208121. 
+-->
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <_PublishTargetUrl>C:\DATI\WORK\ENEL\AFC-HR\ENEL_repository\glhl-ap05703-dev-lan-base-repo-container\src\rulesmngt\out</_PublishTargetUrl>
+    <History>True|2022-07-18T10:36:11.3188683Z;True|2022-07-07T16:05:49.5705109+02:00;True|2022-07-05T19:16:30.7114235+02:00;True|2022-03-17T16:50:30.2396007+01:00;</History>
+  </PropertyGroup>
+</Project>

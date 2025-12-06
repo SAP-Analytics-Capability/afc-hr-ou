@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+https://go.microsoft.com/fwlink/?LinkID=208121. 
+-->
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <_PublishTargetUrl>C:\Users\Lorenzo.Scianguetta\OneDrive - BGP Management Consulting SpA\Progetti BGP\ENEL\REPOSITORY\glhl-ap05703-dev-lan-base-repo-container\src\hrsync\out</_PublishTargetUrl>
+    <History>True|2024-02-23T10:34:11.1686869Z;True|2024-02-23T09:12:26.2922475+01:00;True|2024-02-23T09:07:28.6314134+01:00;True|2024-02-18T17:32:06.2175855+01:00;True|2024-02-16T10:00:27.3137647+01:00;True|2024-01-23T17:04:21.4817016+01:00;True|2024-01-22T10:54:52.1155523+01:00;True|2024-01-19T17:49:18.4036434+01:00;True|2023-07-07T17:31:04.6279333+02:00;True|2023-07-06T14:49:31.6689295+02:00;True|2023-07-05T15:57:25.1209870+02:00;True|2023-07-05T13:03:37.5645768+02:00;True|2023-07-04T17:53:33.5481083+02:00;True|2023-04-06T14:10:01.8132235+02:00;True|2023-04-06T12:46:28.1044009+02:00;True|2023-04-06T12:29:31.2542974+02:00;True|2023-04-04T13:31:25.5944575+02:00;True|2023-04-04T06:18:43.8803028+02:00;True|2023-04-03T16:12:22.8571786+02:00;True|2023-04-03T15:18:07.5392071+02:00;</History>
+  </PropertyGroup>
+  <ItemGroup>
+    <File Include="appsettings.json">
+      <publishTime>02/23/2024 09:06:21</publishTime>
+    </File>
+  </ItemGroup>
+</Project>

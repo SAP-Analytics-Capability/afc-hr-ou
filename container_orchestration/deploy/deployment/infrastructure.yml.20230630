@@ -1,0 +1,431 @@
+# DEPLOYMENT OF MASTERDATA
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: masterdata
+spec:
+  selector:
+    matchLabels:
+      app: masterdata
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: masterdata
+    spec:
+      containers:
+      - name: masterdata
+        image: 359526673054.dkr.ecr.eu-central-1.amazonaws.com/glhl-ap05703-base-lan-dev/container-automation/masterdata:${deploy.version}
+        env:
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: glhl-ap05703-${deploy.env}-secret-aws
+                key: accessKey
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: glhl-ap05703-${deploy.env}-secret-aws
+                key: secretAccessKey
+          - name: ENV
+            value: ${deploy.env}
+          - name: CREATION_TIMESTAMP
+            value: ${deploy.creation_timestamp}
+          - name: TEST
+            value: ${testendpoint}
+          - name: DataSource__DatabaseConfiguration__Host
+            value: ${db_host}
+          - name: DataSource__DatabaseConfiguration__Database
+            value: ${db_database}
+          - name: DataSource__DatabaseConfiguration__Username
+            value: ${db_username}
+          - name: DataSource__DatabaseConfiguration__Password
+            value: ${db_password}
+          - name: DataSource__DatabaseConfiguration__Schema
+            value: ${db_schema}
+          - name: DataSource__SnowAdapterConfiguration__ApiUrl
+            value: ${snow_apiurl}
+          - name: DataSource__SnowAdapterConfiguration__AuthenticationType
+            value: ${snow_authtype}
+          - name: DataSource__SnowAdapterConfiguration__Username
+            value: ${snow_username}
+          - name: DataSource__SnowAdapterConfiguration__Password
+            value: ${snow_password}
+          - name: DataSource__HrSyncConfiguration__ApiUrl
+            value: ${hr_apiurl}
+          - name: DataSource__HrSyncConfiguration__AuthenticationType
+            value: ${hr_authtype}
+          - name: DataSource__HrSyncConfiguration__Username
+            value: ${hr_username}
+          - name: DataSource__HrSyncConfiguration__Password
+            value: ${hr_password}
+          - name: DataSource__BwSyncConfiguration__ApiUrl
+            value: ${bw_apiurl}
+          - name: DataSource__BwSyncConfiguration__AuthenticationType
+            value: ${bw_authtype}
+          - name: DataSource__BwSyncConfiguration__Username
+            value: ${bw_username}
+          - name: DataSource__BwSyncConfiguration__Password
+            value: ${snow_password}
+          - name: DataSource__RulesMngtConfiguration__ApiUrl
+            value: ${rul_apiurl}
+          - name: DataSource__RulesMngtConfiguration__AuthenticationType
+            value: ${rul_authtype}
+          - name: DataSource__RulesMngtConfiguration__Username
+            value: ${rul_username}
+          - name: DataSource__RulesMngtConfiguration__Password
+            value: ${rul_password}
+          - name: DataSource__RedisConfiguration__ConnectionString
+            value: ${redis_connectionstring}
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        resources:
+          requests:
+            memory: "0.6Gi"
+            cpu: "0.005"
+          limits:
+            memory: "1Gi"
+            cpu: "0.1"
+---
+#You can remove the annotations if you want a public ip
+apiVersion: v1
+kind: Service
+metadata:
+   name: masterdata
+   labels:
+      app: masterdata
+   annotations: 
+      service.beta.kubernetes.io/aws-load-balancer-internal: 0.0.0.0/0
+spec:
+   selector:
+      app: masterdata
+   ports:
+    - port: 5005
+      targetPort: 80
+      protocol: TCP
+   type: LoadBalancer
+---
+# DEPLOYMENT OF HRSYNC
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hrsync
+spec:
+  selector:
+    matchLabels:
+      app: hrsync
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: hrsync
+    spec:
+      containers:
+      - name: hrsync
+        image: 359526673054.dkr.ecr.eu-central-1.amazonaws.com/glhl-ap05703-base-lan-dev/container-automation/hrsync:${deploy.version}
+        env:
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: glhl-ap05703-${deploy.env}-secret-aws
+                key: accessKey
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: glhl-ap05703-${deploy.env}-secret-aws
+                key: secretAccessKey
+          - name: ENV
+            value: ${deploy.env}
+          - name: CREATION_TIMESTAMP
+            value: ${deploy.creation_timestamp}
+          - name: TEST
+            value: ${testendpoint}
+          - name: DataSource__DatabaseConfiguration__Host
+            value: ${db_host}
+          - name: DataSource__DatabaseConfiguration__Database
+            value: ${db_database}
+          - name: DataSource__DatabaseConfiguration__Username
+            value: ${db_username}
+          - name: DataSource__DatabaseConfiguration__Password
+            value: ${db_password}
+          - name: DataSource__DatabaseConfiguration__Schema
+            value: ${db_schema}
+          - name: DataSource__HrGlobalConfiguration__ApiUrl
+            value: ${hrglobal_apiurl}
+          - name: DataSource__HrGlobalConfiguration__AuthenticationType
+            value: ${hrglobal_authtype}
+          - name: DataSource__HrGlobalConfiguration__Username
+            value: ${hrglobal_username}
+          - name: DataSource__HrGlobalConfiguration__Password
+            value: ${hrglobal_password}
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        resources:
+          requests:
+            memory: "0.1Gi"
+            cpu: "0.005"
+          limits:
+            memory: "1Gi"
+            cpu: "0.1"
+---
+#You can remove the annotations if you want a public ip
+apiVersion: v1
+kind: Service
+metadata:
+   name: hrsync
+   labels:
+      app: hrsync
+   annotations: 
+      service.beta.kubernetes.io/aws-load-balancer-internal: 0.0.0.0/0
+spec:
+   selector:
+      app: hrsync
+   ports:
+    - port: 5006
+      targetPort: 80
+      protocol: TCP
+   type: LoadBalancer
+---
+# DEPLOYMENT OF rulesmngt
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rulesmngt
+spec:
+  selector:
+    matchLabels:
+      app: rulesmngt
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: rulesmngt
+    spec:
+      containers:
+      - name: rulesmngt
+        image: 359526673054.dkr.ecr.eu-central-1.amazonaws.com/glhl-ap05703-base-lan-dev/container-automation/rulesmngt:${deploy.version}
+        env:
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: glhl-ap05703-${deploy.env}-secret-aws
+                key: accessKey
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: glhl-ap05703-${deploy.env}-secret-aws
+                key: secretAccessKey
+          - name: ENV
+            value: ${deploy.env}
+          - name: CREATION_TIMESTAMP
+            value: ${deploy.creation_timestamp}
+          - name: TEST
+            value: ${testendpoint}
+          - name: DataSource__DatabaseConfiguration__Host
+            value: ${db_host}
+          - name: DataSource__DatabaseConfiguration__Database
+            value: ${db_database}
+          - name: DataSource__DatabaseConfiguration__Username
+            value: ${db_username}
+          - name: DataSource__DatabaseConfiguration__Password
+            value: ${db_password}
+          - name: DataSource__DatabaseConfiguration__Schema
+            value: ${db_schema}
+          - name: DataSource__SnowCatalogConfiguration__ApiUrl
+            value: ${snowcatalog_apiurl}
+          - name: DataSource__SnowCatalogConfiguration__AuthenticationType
+            value: ${snow_authtype}
+          - name: DataSource__SnowCatalogConfiguration__Username
+            value: ${snow_username}
+          - name: DataSource__SnowCatalogConfiguration__Password
+            value: ${snow_password}
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        resources:
+          requests:
+            memory: "0.1Gi"
+            cpu: "0.005"
+          limits:
+            memory: "0.5Gi"
+            cpu: "0.1"
+---
+#You can remove the annotations if you want a public ip
+apiVersion: v1
+kind: Service
+metadata:
+   name: rulesmngt
+   labels:
+      app: rulesmngt
+   annotations: 
+      service.beta.kubernetes.io/aws-load-balancer-internal: 0.0.0.0/0
+spec:
+   selector:
+      app: rulesmngt
+   ports:
+    - port: 5007
+      targetPort: 80
+      protocol: TCP
+   type: LoadBalancer
+---
+# DEPLOYMENT OF bwsync
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bwsync
+spec:
+  selector:
+    matchLabels:
+      app: bwsync
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: bwsync
+    spec:
+      containers:
+      - name: bwsync
+        image: 359526673054.dkr.ecr.eu-central-1.amazonaws.com/glhl-ap05703-base-lan-dev/container-automation/bwsync:${deploy.version}
+        env:
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: glhl-ap05703-${deploy.env}-secret-aws
+                key: accessKey
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: glhl-ap05703-${deploy.env}-secret-aws
+                key: secretAccessKey
+          - name: ENV
+            value: ${deploy.env}
+          - name: CREATION_TIMESTAMP
+            value: ${deploy.creation_timestamp}
+          - name: TEST
+            value: ${testendpoint}
+          - name: DataSource__DatabaseConfiguration__Host
+            value: ${db_host}
+          - name: DataSource__DatabaseConfiguration__Database
+            value: ${db_database}
+          - name: DataSource__DatabaseConfiguration__Username
+            value: ${db_username}
+          - name: DataSource__DatabaseConfiguration__Password
+            value: ${db_password}
+          - name: DataSource__DatabaseConfiguration__Schema
+            value: ${db_schema}
+          - name: DataSource__BwGlobalConfiguration__ApiUrlSap
+            value: ${bwglobal_apiurl}
+          - name: DataSource__BwGlobalConfiguration__AuthenticationTypeSap
+            value: ${bwglobal_authtype}
+          - name: DataSource__BwGlobalConfiguration__UsernameSap
+            value: ${bwglobal_username}
+          - name: DataSource__BwGlobalConfiguration__PasswordSap
+            value: ${bwglobal_password}
+        ports:
+        - containerPort: 80
+          protocol: TCP
+        resources:
+          requests:
+            memory: "0.1Gi"
+            cpu: "0.005"
+          limits:
+            memory: "0.5Gi"
+            cpu: "0.1"
+---
+#You can remove the annotations if you want a public ip
+apiVersion: v1
+kind: Service
+metadata:
+   name: bwsync
+   labels:
+      app: bwsync
+   annotations: 
+      service.beta.kubernetes.io/aws-load-balancer-internal: 0.0.0.0/0
+spec:
+   selector:
+      app: bwsync
+   ports:
+    - port: 5008
+      targetPort: 80
+      protocol: TCP
+   type: LoadBalancer
+---
+# DEPLOYMENT OF redis
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+spec:
+  selector:
+    matchLabels:
+      app: redis
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: 359526673054.dkr.ecr.eu-central-1.amazonaws.com/glhl-ap05703-base-lan-dev/container-automation/redis:${deploy.version}
+        env:
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: glhl-ap05703-${deploy.env}-secret-aws
+                key: accessKey
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: glhl-ap05703-${deploy.env}-secret-aws
+                key: secretAccessKey
+          - name: ENV
+            value: ${deploy.env}
+          - name: CREATION_TIMESTAMP
+            value: ${deploy.creation_timestamp}
+          - name: TEST
+            value: ${testendpoint}
+        ports:
+        - containerPort: 6379
+          protocol: TCP
+        volumeMounts:
+        - name: redis-data-volume
+          mountPath: /data
+      volumes:
+      - name: redis-data-volume
+        persistentVolumeClaim:
+          claimName: redis-claim
+---
+#You can remove the annotations if you want a public ip
+apiVersion: v1
+kind: Service
+metadata:
+   name: redis
+   labels:
+      app: redis
+   annotations: 
+      service.beta.kubernetes.io/aws-load-balancer-internal: 0.0.0.0/0
+spec:
+   selector:
+      app: redis
+   ports:
+    - port: 6379
+      targetPort: 6379
+      protocol: TCP
+   type: LoadBalancer
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-claim
+  annotations:
+    volume.beta.kubernetes.io/storage-class: "aws-efs"
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+---

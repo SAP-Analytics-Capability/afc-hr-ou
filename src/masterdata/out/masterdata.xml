@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>masterdata</name>
+    </assembly>
+    <members>
+        <member name="M:masterdata.Controllers.AssociationController.GetAssociation">
+            <summary>This endpoint returns the result of the association of the Cost Center and Organizational Units.</summary>
+        </member>
+        <member name="M:masterdata.Controllers.BwDataTestController.Test">
+            <summary>This endpoint returns the result of the association of the Cost Center and Organizational Units.</summary>
+        </member>
+        <member name="M:masterdata.Controllers.SnowAdatpterController.GetAggancioCC">
+            <summary>This endpoint triggers the call to Service Now endpoint and it gets the user confirmation about the association proposed by the computation.</summary>
+        </member>
+        <member name="M:masterdata.Controllers.TestMail.SendMail">
+            <summary>This endpoint triggers the call to Service Now endpoint and it gets the user confirmation about the association proposed by the computation.</summary>
+        </member>
+    </members>
+</doc>

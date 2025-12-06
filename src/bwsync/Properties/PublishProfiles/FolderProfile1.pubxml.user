@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+https://go.microsoft.com/fwlink/?LinkID=208121. 
+-->
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <_PublishTargetUrl>C:\DATI\WORK\ENEL\AFC-HR\ENEL_repository\glhl-ap05703-dev-lan-base-repo-container\src\bwsync\out</_PublishTargetUrl>
+    <History>True|2022-06-16T08:17:00.0656499Z;True|2022-06-15T11:03:10.1495154+02:00;True|2022-06-15T11:01:44.9629856+02:00;True|2022-06-15T10:57:59.2568160+02:00;True|2022-06-14T17:51:49.6561056+02:00;</History>
+  </PropertyGroup>
+</Project>
