@@ -1,0 +1,2888 @@
+--
+-- PostgreSQL database dump
+--
+
+\restrict XHKZsCyUBnFvIg7lhQsDCaXv637I9sZ8u10aFAMGQKsxjVWJmwrUZi1Qx6f6szV
+
+-- Dumped from database version 12.5
+-- Dumped by pg_dump version 18.1
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: afchr_int_schema; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA afchr_int_schema;
+
+
+--
+-- Name: cleaning_function(); Type: FUNCTION; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE FUNCTION afchr_int_schema.cleaning_function() RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+ var_tablename RECORD;
+var_query_trunc text;
+var_query_insert text;
+   
+
+BEGIN
+
+    RAISE NOTICE '--------------------- START ---------------------';	
+		
+		for var_tablename IN select table_name, table_backup from afchr_int_schema.cleaningtable
+		loop
+		var_query_trunc = '
+   		truncate table ' || var_tablename.table_backup ||  ';';
+		execute var_query_trunc;
+		
+		truncate table afchr_int_schema.hrmasterdataoubck;
+	
+		INSERT INTO afchr_int_schema.hrmasterdataoubck(
+		SELECT * FROM afchr_int_schema.hrmasterdataou);
+		var_query_insert ='
+   		
+        INSERT INTO ' || var_tablename.table_backup ||  '(
+		SELECT * FROM ' || var_tablename.table_name ||  ');';
+		execute var_query_insert;
+	
+		var_query_trunc = 'truncate table ' || var_tablename.table_name ||  ';';
+		execute var_query_trunc;
+		
+		END loop;
+		
+        RAISE NOTICE 'UPDATED -> %', var_query_trunc;	
+        
+
+	RAISE NOTICE '---------------------- END ----------------------';
+	return true;
+    
+end;
+$$;
+
+
+--
+-- Name: cleaningconsolidate_function(); Type: FUNCTION; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE FUNCTION afchr_int_schema.cleaningconsolidate_function() RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+ var_tablename RECORD;
+var_query_trunc text;
+var_query_insert text;
+   
+
+BEGIN
+
+    RAISE NOTICE '--------------------- START ---------------------';	
+   
+		truncate table afchr_int_schema.companyscopebck;
+		INSERT INTO afchr_int_schema.companyscopebck(
+		SELECT * FROM afchr_int_schema.companyscope);
+   		
+		truncate table afchr_int_schema.companyscope;
+	RAISE NOTICE '---------------------- END ----------------------';
+	return true;
+    
+end;
+$$;
+
+
+--
+-- Name: cleaningtranscoding_function(); Type: FUNCTION; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE FUNCTION afchr_int_schema.cleaningtranscoding_function() RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+
+   
+
+BEGIN
+
+    RAISE NOTICE '--------------------- START ---------------------';	
+		
+		truncate table afchr_int_schema.activityassociationbck;
+		INSERT INTO afchr_int_schema.activityassociationbck(
+		SELECT * FROM afchr_int_schema.activityassociation);
+   		
+		truncate table afchr_int_schema.activityassociation;
+	RAISE NOTICE '---------------------- END ----------------------';
+	return true;
+    
+end;
+$$;
+
+
+--
+-- Name: run_group_scheduled_function(); Type: FUNCTION; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE FUNCTION afchr_int_schema.run_group_scheduled_function() RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+	declare
+		giorno_corrente integer;
+		ora_corrente integer;
+		scheduled_svecchiamento integer;
+		max_access_id integer;
+		msg_error varchar(2000);
+		sched_name varchar(2000);
+
+	BEGIN
+
+		msg_error = '';
+		SELECT EXTRACT(DAY FROM CURRENT_DATE) into giorno_corrente;
+		-- SELECT EXTRACT(HOUR FROM CURRENT_TIMESTAMP) into ora_corrente;
+		
+		-- ##################################################
+		-- INIZIO BLOCCO PROCEDURA SVECCHIAMENTO_TAB_CLEANING
+		RAISE INFO '% Check RUN Svecchiamento tabelle cleaning', now();
+		sched_name = 'SVECCHIAMENTO_TAB_CLEANING';
+		scheduled_svecchiamento = -1;
+		select min(sched_config_id) into scheduled_svecchiamento from afchr_int_schema.schedulerconfiguration
+		where scheduler_name = sched_name
+			  and day_of_month = giorno_corrente 
+			  -- and time_of_day >= ora_corrente
+			  and active = 1;
+		RAISE INFO 'sched_config_id: %', scheduled_svecchiamento;
+		msg_error = 'ERROR in sched_config_id: ' || scheduled_svecchiamento;
+
+		if scheduled_svecchiamento > -1 then
+			RAISE INFO '% Svecchiamento tabelle cleaning in Running', now();
+			
+			-- call function
+			-- select afchr_int_schema.svecchiamento_tabelle_cleaning_function_lotto();
+			select x;
+            
+			RAISE INFO '% Svecchiamento tabelle cleaning End', now();
+           
+			-- Log in clientaccess
+            select max(access_id) + 1 into max_access_id from afchr_int_schema.clientaccess;
+            INSERT INTO afchr_int_schema.clientaccess
+				(access_id, username, access_timestamp, access_type, status, exit_timestamp)
+				VALUES( max_access_id, sched_name, now(), 'CTRL-M', 'E', now());
+		end if;
+		RAISE INFO '% END Check RUN Svecchiamento tabelle cleaning', now();
+        -- FINE BLOCCO PROCEDURA SVECCHIAMENTO_TAB_CLEANING
+		-- ################################################
+		
+		-- return '0';
+		-- GESTIONE EXCEPTION
+        EXCEPTION WHEN OTHERS then
+        	select max(access_id) + 1 into max_access_id from afchr_int_schema.clientaccess;
+        	INSERT INTO afchr_int_schema.clientaccess
+				(access_id, username, access_timestamp, access_type, status, exit_timestamp)
+				VALUES( max_access_id, sched_name, now(), 'CTRL-M', msg_error, now());
+			-- return '1';
+		
+	END;
+$$;
+
+
+--
+-- Name: run_scheduled_svecchiamento_tabelle_cleaning_function(); Type: FUNCTION; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE FUNCTION afchr_int_schema.run_scheduled_svecchiamento_tabelle_cleaning_function() RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+	declare
+		giorno_corrente integer;
+		ora_corrente integer;
+		scheduled_svecchiamento integer;
+		max_access_id integer;
+		msg_error varchar(2000);
+		sched_name varchar(2000);
+
+	BEGIN
+
+		msg_error = '';
+		SELECT EXTRACT(DAY FROM CURRENT_DATE) into giorno_corrente;
+		-- SELECT EXTRACT(HOUR FROM CURRENT_TIMESTAMP) into ora_corrente;
+		
+		-- ##################################################
+		-- INIZIO BLOCCO PROCEDURA SVECCHIAMENTO_TAB_CLEANING
+		RAISE INFO '% Check RUN Svecchiamento tabelle cleaning', now();
+		sched_name = 'SVECCHIAMENTO_TAB_CLEANING';
+		scheduled_svecchiamento = -1;
+		select coalesce(min(sched_config_id),-1) into scheduled_svecchiamento from afchr_int_schema.schedulerconfiguration
+		where scheduler_name = sched_name
+			  and day_of_month = giorno_corrente 
+			  -- and time_of_day >= ora_corrente
+			  and active = 1;
+		-- init msg error
+		msg_error = 'ERROR in sched_config_id: ' || scheduled_svecchiamento;
+				
+		if scheduled_svecchiamento > -1 then
+			RAISE INFO '% Svecchiamento tabelle cleaning in Running on sched_config_id %', now(), scheduled_svecchiamento;
+			
+			-- call function
+			perform afchr_int_schema.svecchiamento_tabelle_cleaning_function_lotto();
+            
+			RAISE INFO '% Svecchiamento tabelle cleaning End', now();
+           
+			-- Log in clientaccess
+			select coalesce(max(access_id),0) into max_access_id from afchr_int_schema.clientaccess
+			where username = sched_name;
+			if max_access_id > 0 then
+				update afchr_int_schema.clientaccess set access_timestamp = now(), exit_timestamp = now()
+				,status = 'E' where access_id = max_access_id;
+			else
+            	select nextval('afchr_int_schema.clientaccess_access_id_seq') into max_access_id;
+            	INSERT INTO afchr_int_schema.clientaccess
+					(access_id, username, access_timestamp, access_type, status, exit_timestamp)
+					VALUES( max_access_id, sched_name, now(), 'CTRL-M', 'E', now());
+			end if;
+		else
+			RAISE INFO '% Svecchiamento tabelle cleaning NOT Scheduled today', now();
+		end if;
+
+		RAISE INFO '% END Check RUN Svecchiamento tabelle cleaning', now();
+        -- FINE BLOCCO PROCEDURA SVECCHIAMENTO_TAB_CLEANING
+		-- ################################################
+		
+		return 0;
+		-- GESTIONE EXCEPTION
+        EXCEPTION WHEN OTHERS then
+        	-- Log in clientaccess
+			select coalesce(max(access_id),0) into max_access_id from afchr_int_schema.clientaccess
+			where username = sched_name;
+			if max_access_id > 0 then
+				update afchr_int_schema.clientaccess set access_timestamp = now(), exit_timestamp = now()
+				,status = msg_error where access_id = max_access_id;
+			else
+            	select nextval('afchr_int_schema.clientaccess_access_id_seq') into max_access_id;
+            	INSERT INTO afchr_int_schema.clientaccess
+					(access_id, username, access_timestamp, access_type, status, exit_timestamp)
+					VALUES( max_access_id, sched_name, now(), 'CTRL-M', msg_error, now());
+			end if;
+			-- raise;
+			raise notice '% Svecchiamento exception % %', now(), sqlstate, sqlerrm;
+			return 1;
+		
+	END;
+$$;
+
+
+--
+-- Name: svecchiamento_massivo_tabelle_cleaning_function(); Type: FUNCTION; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE FUNCTION afchr_int_schema.svecchiamento_massivo_tabelle_cleaning_function() RETURNS integer
+    LANGUAGE plpgsql
+    AS $$
+	declare
+		giorno_corrente integer;
+		ora_corrente integer;
+		scheduled_svecchiamento integer;
+		max_access_id integer;
+		msg_error varchar(2000);
+		sched_name varchar(2000);
+
+	BEGIN
+
+		msg_error = '';
+		SELECT EXTRACT(DAY FROM CURRENT_DATE) into giorno_corrente;
+		-- SELECT EXTRACT(HOUR FROM CURRENT_TIMESTAMP) into ora_corrente;
+		
+		-- ##################################################
+		-- INIZIO BLOCCO PROCEDURA SVECCHIAMENTO_TAB_CLEANING
+		RAISE INFO '% Check RUN Svecchiamento tabelle cleaning', now();
+		sched_name = 'SVECCHIAMENTO_TAB_CLEANING';
+		scheduled_svecchiamento = -1;
+		select coalesce(min(sched_config_id),-1) into scheduled_svecchiamento from afchr_int_schema.schedulerconfiguration
+		where scheduler_name = sched_name
+			  and day_of_month = giorno_corrente 
+			  -- and time_of_day >= ora_corrente
+			  and active = 1;
+		-- init msg error
+		msg_error = 'ERROR in sched_config_id: ' || scheduled_svecchiamento;
+				
+		if scheduled_svecchiamento > -1 then
+			RAISE INFO '% Svecchiamento tabelle cleaning in Running on sched_config_id %', now(), scheduled_svecchiamento;
+
+			-- backup table cleanbwcc
+			begin
+				RAISE INFO '% BACKUP tabella cleanbwcc.', now();
+				if (SELECT EXISTS (
+					    SELECT FROM information_schema.tables 
+    							WHERE 
+        							table_schema = 'afchr_int_schema' AND 
+        							table_type = 'BASE TABLE' AND
+        							table_name = 'cleanbwccbck'
+    								)) then
+					drop table afchr_int_schema.cleanbwccbck;
+				end if;
+				create table afchr_int_schema.cleanbwccbck as select * from afchr_int_schema.cleanbwcc;
+				RAISE INFO '% tabella cleanbwccbck creata.', now();
+			end;
+		
+			-- delete cleanbwcc
+			begin
+				RAISE INFO '% DELETING tabella cleanbwcc.', now();
+				delete from afchr_int_schema.cleanbwcc c2 
+					WHERE	fa_id in (
+					select id_fa from afchr_int_schema.functionalack where expiration_date < current_date
+					)
+				;
+				RAISE INFO '% DELETED tabella cleanbwcc.', now();
+			end;
+            
+			-- backup table cleanhrou
+			begin
+				RAISE INFO '% BACKUP tabella cleanhrou.', now();
+				if (SELECT EXISTS (
+					    SELECT FROM information_schema.tables 
+    							WHERE 
+        							table_schema = 'afchr_int_schema' AND 
+        							table_type = 'BASE TABLE' AND
+        							table_name = 'cleanhroubck'
+    								)) then
+					drop table afchr_int_schema.cleanhroubck;
+				end if;
+				create table afchr_int_schema.cleanhroubck as select * from afchr_int_schema.cleanhrou;
+				RAISE INFO '% tabella cleanhroubck creata.', now();
+			end;
+		
+			-- delete cleanhrou
+			begin
+				RAISE INFO '% DELETING tabella cleanhrou.', now();
+				DELETE FROM afchr_int_schema.cleanhrou c2  
+	       			WHERE fa_id IN (
+	       			select id_fa from afchr_int_schema.functionalack where expiration_date < current_date
+	       			)
+      			;
+      			RAISE INFO '% DELETED tabella cleanhrou.', now();
+      		end;
+     
+			RAISE INFO '% Svecchiamento tabelle cleaning End', now();
+           
+			-- Log in clientaccess
+			select coalesce(max(access_id),0) into max_access_id from afchr_int_schema.clientaccess
+			where username = sched_name;
+			if max_access_id > 0 then
+				update afchr_int_schema.clientaccess set access_timestamp = now(), exit_timestamp = now()
+				,status = 'E' where access_id = max_access_id;
+			else
+            	select nextval('afchr_int_schema.clientaccess_access_id_seq') into max_access_id;
+            	INSERT INTO afchr_int_schema.clientaccess
+					(access_id, username, access_timestamp, access_type, status, exit_timestamp)
+					VALUES( max_access_id, sched_name, now(), 'CTRL-M', 'E', now());
+			end if;
+		else
+			RAISE INFO '% Svecchiamento tabelle cleaning NOT Scheduled today', now();
+		end if;
+
+		RAISE INFO '% END Check RUN Svecchiamento tabelle cleaning', now();
+        -- FINE BLOCCO PROCEDURA SVECCHIAMENTO_TAB_CLEANING
+		-- ################################################
+		
+		return 0;
+		-- GESTIONE EXCEPTION
+        EXCEPTION WHEN OTHERS then
+        	-- Log in clientaccess
+        	msg_error = sqlstate || ' - ' || sqlerrm;
+			select coalesce(max(access_id),0) into max_access_id from afchr_int_schema.clientaccess
+			where username = sched_name;
+			if max_access_id > 0 then
+				update afchr_int_schema.clientaccess set access_timestamp = now(), exit_timestamp = now()
+				,status = msg_error where access_id = max_access_id;
+			else
+            	select nextval('afchr_int_schema.clientaccess_access_id_seq') into max_access_id;
+            	INSERT INTO afchr_int_schema.clientaccess
+					(access_id, username, access_timestamp, access_type, status, exit_timestamp)
+					VALUES( max_access_id, sched_name, now(), 'CTRL-M', msg_error, now());
+			end if;
+			-- raise;
+			raise notice '% Svecchiamento exception % %', now(), sqlstate, sqlerrm;
+			return 1;
+		
+	END;
+$$;
+
+
+--
+-- Name: svecchiamento_tabelle_cleaning_function(); Type: FUNCTION; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE FUNCTION afchr_int_schema.svecchiamento_tabelle_cleaning_function() RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+	declare
+		conta integer;
+	    fa_id_lotto_min integer;
+	    fa_id_lotto_max integer;
+	    lotto_attuale integer = 0;
+	    query varchar(2000);
+begin
+		
+	RAISE NOTICE '---------------------AVVIO SVECCHIAMENTO---------------------';
+
+	select coalesce(min(id_fa)-1,0) into fa_id_lotto_max from afchr_int_schema.functionalack where expiration_date > current_date;
+
+  	RAISE NOTICE 'fa_id_lotto_max: %', fa_id_lotto_max;
+  
+  	RAISE NOTICE '-------Avvio delete cleanbwcc-------';
+	select coalesce(min(fa_id),1) into fa_id_lotto_min from afchr_int_schema.cleanbwcc c;
+    RAISE NOTICE 'fa_id_lotto_min: %', fa_id_lotto_min;
+
+	loop
+		select count(*) into conta from afchr_int_schema.cleanbwcc; 
+		RAISE NOTICE 'Righe in tabella: %', conta;
+		select count(*) into conta from afchr_int_schema.cleanbwcc where fa_id between fa_id_lotto_min and fa_id_lotto_max;
+		RAISE NOTICE 'Righe restanti: %', conta;
+
+		if fa_id_lotto_min > fa_id_lotto_max  THEN
+			RAISE NOTICE 'Delete cleanbwcc terminata con successo!';
+			exit;
+		end if;			
+ 
+		if fa_id_lotto_min != lotto_attuale  THEN
+			RAISE NOTICE 'Delete per lotto %', fa_id_lotto_min ;
+			lotto_attuale = fa_id_lotto_min;
+		end if;			
+
+		DELETE FROM afchr_int_schema.cleanbwcc c2 WHERE	fa_id = lotto_attuale;
+	
+		select coalesce(min(fa_id),1) into fa_id_lotto_min from afchr_int_schema.cleanbwcc c;
+	end loop;
+  
+    
+    RAISE NOTICE '-------Avvio delete cleanhrou-------';
+   	select coalesce(min(fa_id),1) into fa_id_lotto_min from afchr_int_schema.cleanhrou c;	
+    RAISE NOTICE 'fa_id_lotto_min: %', fa_id_lotto_min;
+   
+	loop
+		select count(*) into conta from afchr_int_schema.cleanhrou; 
+		RAISE NOTICE 'Righe in tabella: %', conta;
+		select count(*) into conta from afchr_int_schema.cleanhrou where fa_id between fa_id_lotto_min and fa_id_lotto_max;
+		RAISE NOTICE 'Righe restanti: %', conta;
+
+		if fa_id_lotto_min > fa_id_lotto_max  THEN
+			RAISE NOTICE 'Delete cleanhrou terminata con successo!';
+			exit;
+		end if;			
+
+		if fa_id_lotto_min != lotto_attuale  THEN
+			RAISE NOTICE 'Delete per lotto %', fa_id_lotto_min ;
+			lotto_attuale = fa_id_lotto_min;
+		end if;			
+
+		DELETE FROM afchr_int_schema.cleanhrou c2 WHERE hrmdou_id IN (SELECT hrmdou_id FROM afchr_int_schema.cleanhrou c2 where fa_id = fa_id_lotto_min LIMIT 500);
+	
+		select coalesce(min(fa_id),1) into fa_id_lotto_min from afchr_int_schema.cleanhrou c;
+	end loop;
+
+	RAISE NOTICE '---------------------FINE SVECCHIAMENTO---------------------';
+
+END;
+$$;
+
+
+--
+-- Name: svecchiamento_tabelle_cleaning_function_lotto(integer); Type: FUNCTION; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE FUNCTION afchr_int_schema.svecchiamento_tabelle_cleaning_function_lotto(lotto integer DEFAULT NULL::integer) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+	declare
+		conta integer;
+	    fa_id_lotto_min integer;
+	    fa_id_lotto_max integer;
+	    fa_id_lotto_max_lotto integer;
+	    lotto_attuale integer = 0;
+	    query varchar(2000);
+begin
+		
+	RAISE NOTICE '---------------------AVVIO SVECCHIAMENTO---------------------';
+
+	select coalesce(min(id_fa)-1,0) into fa_id_lotto_max from afchr_int_schema.functionalack where expiration_date > current_date;
+
+	if lotto > 0 then
+		select coalesce(min(fa_id),1) into fa_id_lotto_max_lotto from afchr_int_schema.cleanbwcc c;
+		fa_id_lotto_max_lotto = fa_id_lotto_max_lotto + lotto;
+	
+		if fa_id_lotto_max_lotto < fa_id_lotto_max then
+			fa_id_lotto_max = fa_id_lotto_max_lotto;
+		end if;
+	end if;
+
+
+  	RAISE NOTICE 'fa_id_lotto_max: %', fa_id_lotto_max;
+  
+  	RAISE NOTICE '-------Avvio delete cleanbwcc-------';
+	select coalesce(min(fa_id),1) into fa_id_lotto_min from afchr_int_schema.cleanbwcc c;
+    RAISE NOTICE 'fa_id_lotto_min: %', fa_id_lotto_min;
+
+	loop
+		select count(*) into conta from afchr_int_schema.cleanbwcc; 
+		RAISE NOTICE 'Righe in tabella: %', conta;
+		select count(*) into conta from afchr_int_schema.cleanbwcc where fa_id between fa_id_lotto_min and fa_id_lotto_max;
+		RAISE NOTICE 'Righe restanti: %', conta;
+
+		if fa_id_lotto_min > fa_id_lotto_max  THEN
+			RAISE NOTICE 'Delete cleanbwcc terminata con successo!';
+			exit;
+		end if;			
+ 
+		if fa_id_lotto_min != lotto_attuale  THEN
+			RAISE NOTICE 'Delete per lotto %', fa_id_lotto_min ;
+			lotto_attuale = fa_id_lotto_min;
+		end if;			
+
+		DELETE FROM afchr_int_schema.cleanbwcc c2 WHERE	fa_id = lotto_attuale;
+	
+		select coalesce(min(fa_id),1) into fa_id_lotto_min from afchr_int_schema.cleanbwcc c;
+	end loop;
+  
+    
+    RAISE NOTICE '-------Avvio delete cleanhrou-------';
+   	select coalesce(min(fa_id),1) into fa_id_lotto_min from afchr_int_schema.cleanhrou c;	
+    RAISE NOTICE 'fa_id_lotto_min: %', fa_id_lotto_min;
+   
+	loop
+		select count(*) into conta from afchr_int_schema.cleanhrou; 
+		RAISE NOTICE 'Righe in tabella: %', conta;
+		select count(*) into conta from afchr_int_schema.cleanhrou where fa_id between fa_id_lotto_min and fa_id_lotto_max;
+		RAISE NOTICE 'Righe restanti: %', conta;
+
+		if fa_id_lotto_min > fa_id_lotto_max  THEN
+			RAISE NOTICE 'Delete cleanhrou terminata con successo!';
+			exit;
+		end if;			
+
+		if fa_id_lotto_min != lotto_attuale  THEN
+			RAISE NOTICE 'Delete per lotto %', fa_id_lotto_min ;
+			lotto_attuale = fa_id_lotto_min;
+		end if;			
+
+		DELETE FROM afchr_int_schema.cleanhrou c2 WHERE hrmdou_id IN (SELECT hrmdou_id FROM afchr_int_schema.cleanhrou c2 where fa_id = fa_id_lotto_min LIMIT 500);
+	
+		select coalesce(min(fa_id),1) into fa_id_lotto_min from afchr_int_schema.cleanhrou c;
+	end loop;
+
+	RAISE NOTICE '---------------------FINE SVECCHIAMENTO---------------------';
+
+END;
+$$;
+
+
+--
+-- Name: update_bwcc(); Type: FUNCTION; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE FUNCTION afchr_int_schema.update_bwcc() RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    var_id_row int;
+BEGIN
+
+    RAISE NOTICE '--------------------- START ---------------------';	
+
+
+    for var_id_row IN select c.association_cost_center_id from bwcc c order by c.association_cost_center_id desc
+    LOOP
+		update bwcc set association_cost_center_id = association_cost_center_id + 7534, organization_unit_id = organization_unit_id + 1217 where association_cost_center_id = var_id_row;
+	
+        RAISE NOTICE 'UPDATED -> %', var_id_row;	
+        
+    END LOOP;
+	RAISE NOTICE '---------------------- END ----------------------';
+	return true;
+    
+end;
+$$;
+
+
+--
+-- Name: update_hrou(); Type: FUNCTION; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE FUNCTION afchr_int_schema.update_hrou() RETURNS boolean
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    var_id_row int;
+BEGIN
+
+    RAISE NOTICE '--------------------- START ---------------------';	
+
+
+    for var_id_row IN select h.hrmdou_id from hrou h order by h.hrmdou_id desc
+    LOOP
+		update hrou set hrmdou_id = hrmdou_id + 1217 where hrmdou_id = var_id_row;
+	
+        RAISE NOTICE 'UPDATED -> %', var_id_row;	
+        
+    END LOOP;
+	RAISE NOTICE '---------------------- END ----------------------';
+	return true;
+    
+end;
+$$;
+
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: activityassociation; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.activityassociation (
+    record_id integer NOT NULL,
+    po_attribute text,
+    po_object_id text,
+    po_object_abbr text,
+    po_bpc_code text,
+    po_description text,
+    po_npa text,
+    po_perimeter text,
+    afc_macroorg1 text,
+    afc_macroorg1_desc text,
+    afc_macroorg2 text,
+    afc_macroorg2_desc text,
+    or_process text,
+    or_process_desc text,
+    or_organization text,
+    or_organization_desc text,
+    or_vcs text,
+    or_vcs_desc text,
+    bpc_object_id text,
+    bpc_object_abbr text,
+    bpc_code text,
+    bpc_desc text,
+    object_type_id text,
+    typology_object text,
+    update_date timestamp without time zone DEFAULT now()
+);
+
+
+--
+-- Name: activityassociation_record_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.activityassociation_record_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: activityassociation_record_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.activityassociation_record_id_seq OWNED BY afchr_int_schema.activityassociation.record_id;
+
+
+--
+-- Name: activityassociationbck; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.activityassociationbck (
+    record_id integer NOT NULL,
+    po_attribute text,
+    po_object_id text,
+    po_object_abbr text,
+    po_bpc_code text,
+    po_description text,
+    po_npa text,
+    po_perimeter text,
+    afc_macroorg1 text,
+    afc_macroorg1_desc text,
+    afc_macroorg2 text,
+    afc_macroorg2_desc text,
+    or_process text,
+    or_process_desc text,
+    or_organization text,
+    or_organization_desc text,
+    or_vcs text,
+    or_vcs_desc text,
+    bpc_object_id text,
+    bpc_object_abbr text,
+    bpc_code text,
+    bpc_desc text,
+    object_type_id text,
+    typology_object text,
+    update_date timestamp without time zone DEFAULT now()
+);
+
+
+--
+-- Name: activityassociationbck_record_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.activityassociationbck_record_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: activityassociationbck_record_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.activityassociationbck_record_id_seq OWNED BY afchr_int_schema.activityassociationbck.record_id;
+
+
+--
+-- Name: associationcostcenter; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.associationcostcenter (
+    association_cost_center_id integer NOT NULL,
+    cost_center_id text,
+    organization_unit_id integer,
+    cost_center_code text,
+    cost_center_description text,
+    start_date_cost_center text,
+    end_date_cost_center text,
+    company text,
+    company_desc text,
+    cost_center text,
+    type_cost_center text,
+    company_code_afc text,
+    company_afc text,
+    country_afc text,
+    macro_org1 text,
+    macro_org2 text,
+    vcs text,
+    process_global text,
+    process_local text,
+    organization text,
+    new_primo_code text,
+    primoresp text,
+    vcs_description text,
+    process_description text,
+    organization_description text
+);
+
+
+--
+-- Name: associationcostcenter_association_cost_center_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.associationcostcenter_association_cost_center_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: associationcostcenter_association_cost_center_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.associationcostcenter_association_cost_center_id_seq OWNED BY afchr_int_schema.associationcostcenter.association_cost_center_id;
+
+
+--
+-- Name: associationorganizationunit; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.associationorganizationunit (
+    organization_unit_id integer NOT NULL,
+    u_org text NOT NULL,
+    u_org_desc text,
+    start_date text,
+    end_date text,
+    country character varying,
+    company text,
+    company_desc text,
+    cost_center text,
+    pred_attr text,
+    pred_attr_desc text,
+    attr_prev_cod text,
+    attr_prev_desc text,
+    perimeter text,
+    perimeter_desc text,
+    bus_line_cod1 text,
+    bus_line_desc1 text,
+    bus_line_cod2 text,
+    bus_line_desc2 text,
+    bus_line_cod3 text,
+    bus_line_desc3 text,
+    bus_line_cod4 text,
+    bus_line_desc4 text,
+    bus_line_cod5 text,
+    bus_line_desc5 text,
+    serv_cod1 text,
+    serv_desc1 text,
+    serv_cod2 text,
+    serv_desc2 text,
+    serv_cod3 text,
+    serv_desc3 text,
+    serv_cod4 text,
+    serv_desc4 text,
+    serv_cod5 text,
+    serv_desc5 text,
+    staff_cod1 text,
+    staff_desc1 text,
+    staff_cod2 text,
+    staff_desc2 text,
+    staff_cod3 text,
+    staff_desc3 text,
+    staff_cod4 text,
+    staff_desc4 text,
+    staff_cod5 text,
+    staff_desc5 text,
+    pred_attr_loc text,
+    pred_attr_desc_loc text,
+    attr_prev_cod_loc text,
+    attr_prev_desc_loc text,
+    perimeter_loc text,
+    perimeter_desc_loc text,
+    bus_line_cod1_loc text,
+    bus_line_desc1_loc text,
+    bus_line_cod2_loc text,
+    bus_line_desc2_loc text,
+    bus_line_cod3_loc text,
+    bus_line_desc3_loc text,
+    bus_line_cod4_loc text,
+    bus_line_desc4_loc text,
+    bus_line_cod5_loc text,
+    bus_line_desc5_loc text,
+    serv_cod1_loc text,
+    serv_desc1_loc text,
+    serv_cod2_loc text,
+    serv_desc2_loc text,
+    serv_cod3_loc text,
+    serv_desc3_loc text,
+    serv_cod4_loc text,
+    serv_desc4_loc text,
+    serv_cod5_loc text,
+    serv_desc5_loc text,
+    staff_cod1_loc text,
+    staff_desc1_loc text,
+    staff_cod2_loc text,
+    staff_desc2_loc text,
+    staff_cod3_loc text,
+    staff_desc3_loc text,
+    staff_cod4_loc text,
+    staff_desc4_loc text,
+    staff_cod5_loc text,
+    staff_desc5_loc text,
+    u_org_cod text,
+    sync_date_time timestamp without time zone,
+    num_hc text
+);
+
+
+--
+-- Name: associationorganizationunit_organization_unit_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.associationorganizationunit_organization_unit_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: associationorganizationunit_organization_unit_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.associationorganizationunit_organization_unit_id_seq OWNED BY afchr_int_schema.associationorganizationunit.organization_unit_id;
+
+
+--
+-- Name: bwcc; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.bwcc (
+    association_cost_center_id integer NOT NULL,
+    organization_unit_id integer,
+    cost_center_code text,
+    cost_center_description text,
+    u_org text,
+    start_date_cost_center text,
+    end_date_cost_center text,
+    type_cost_center text,
+    company_code_afc text,
+    company_afc text,
+    country_afc text,
+    macro_org1 text,
+    macro_org2 text,
+    vcs text,
+    process text,
+    organization text,
+    new_primo_code text,
+    primoresp text,
+    vcs_description text,
+    process_description text,
+    organization_description text,
+    sync_date_time timestamp without time zone
+);
+
+
+--
+-- Name: bwcc_association_cost_center_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.bwcc_association_cost_center_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: bwcc_association_cost_center_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.bwcc_association_cost_center_id_seq OWNED BY afchr_int_schema.bwcc.association_cost_center_id;
+
+
+--
+-- Name: bwccbck; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.bwccbck (
+    association_cost_center_id integer NOT NULL,
+    organization_unit_id integer,
+    cost_center_code text,
+    cost_center_description text,
+    u_org text,
+    start_date_cost_center text,
+    end_date_cost_center text,
+    type_cost_center text,
+    company_code_afc text,
+    company_afc text,
+    country_afc text,
+    macro_org1 text,
+    macro_org2 text,
+    vcs text,
+    process text,
+    organization text,
+    new_primo_code text,
+    primoresp text,
+    vcs_description text,
+    process_description text,
+    organization_description text,
+    sync_date_time timestamp without time zone
+);
+
+
+--
+-- Name: bwccbck_association_cost_center_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.bwccbck_association_cost_center_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: bwccbck_association_cost_center_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.bwccbck_association_cost_center_id_seq OWNED BY afchr_int_schema.bwccbck.association_cost_center_id;
+
+
+--
+-- Name: cleanbwcc; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.cleanbwcc (
+    association_cost_center_id integer NOT NULL,
+    fa_id integer NOT NULL,
+    organization_unit_id integer,
+    u_org text,
+    company_code_afc text,
+    macro_org1 text,
+    macro_org2 text,
+    vcs text,
+    process text,
+    organization text,
+    primoresp text,
+    company_afc text,
+    country_afc text,
+    vcs_description text,
+    organization_description text,
+    issue_time timestamp without time zone,
+    process_description text
+);
+
+
+--
+-- Name: cleanbwcc_association_cost_center_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.cleanbwcc_association_cost_center_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: cleanbwcc_association_cost_center_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.cleanbwcc_association_cost_center_id_seq OWNED BY afchr_int_schema.cleanbwcc.association_cost_center_id;
+
+
+--
+-- Name: cleanbwccbck; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.cleanbwccbck (
+    association_cost_center_id integer,
+    fa_id integer,
+    organization_unit_id integer,
+    u_org text,
+    company_code_afc text,
+    macro_org1 text,
+    macro_org2 text,
+    vcs text,
+    process text,
+    organization text,
+    primoresp text,
+    company_afc text,
+    country_afc text,
+    vcs_description text,
+    organization_description text,
+    issue_time timestamp without time zone,
+    process_description text
+);
+
+
+--
+-- Name: cleanhrou; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.cleanhrou (
+    hrmdou_id integer NOT NULL,
+    u_org text DEFAULT ' '::text,
+    company text DEFAULT ''::text,
+    company_desc text DEFAULT ''::text,
+    cost_center text DEFAULT ''::text,
+    pred_attr text DEFAULT ''::text,
+    attr_prev_cod text DEFAULT ''::text,
+    attr_prev_desc text DEFAULT ''::text,
+    perimeter text DEFAULT ''::text,
+    perimeter_desc text DEFAULT ''::text,
+    bus_line_cod1 text DEFAULT ''::text,
+    bus_line_desc1 text DEFAULT ''::text,
+    bus_line_cod2 text DEFAULT ''::text,
+    bus_line_desc2 text DEFAULT ''::text,
+    bus_line_cod3 text DEFAULT ''::text,
+    bus_line_desc3 text DEFAULT ''::text,
+    bus_line_cod4 text DEFAULT ''::text,
+    bus_line_desc4 text DEFAULT ''::text,
+    bus_line_cod5 text DEFAULT ''::text,
+    bus_line_desc5 text DEFAULT ''::text,
+    serv_cod1 text DEFAULT ''::text,
+    serv_desc1 text DEFAULT ''::text,
+    serv_cod2 text DEFAULT ''::text,
+    serv_desc2 text DEFAULT ''::text,
+    serv_cod3 text DEFAULT ''::text,
+    serv_desc3 text DEFAULT ''::text,
+    serv_cod4 text DEFAULT ''::text,
+    serv_desc4 text DEFAULT ''::text,
+    serv_cod5 text DEFAULT ''::text,
+    serv_desc5 text DEFAULT ''::text,
+    staff_cod1 text DEFAULT ''::text,
+    staff_desc1 text DEFAULT ''::text,
+    staff_cod2 text DEFAULT ''::text,
+    staff_desc2 text DEFAULT ''::text,
+    staff_cod3 text DEFAULT ''::text,
+    staff_desc3 text DEFAULT ''::text,
+    staff_cod4 text DEFAULT ''::text,
+    staff_desc4 text DEFAULT ''::text,
+    staff_cod5 text DEFAULT ''::text,
+    staff_desc5 text DEFAULT ' '::text,
+    fa_id integer,
+    id_fa character varying(1024),
+    caller character varying(1024),
+    issue_time character varying(1024),
+    expiration_date character varying(1024),
+    status character varying(1024),
+    input_type character varying(1024)
+);
+
+
+--
+-- Name: cleanhrou_hrmdou_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.cleanhrou_hrmdou_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: cleanhrou_hrmdou_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.cleanhrou_hrmdou_id_seq OWNED BY afchr_int_schema.cleanhrou.hrmdou_id;
+
+
+--
+-- Name: cleanhroubck; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.cleanhroubck (
+    hrmdou_id integer,
+    u_org text,
+    company text,
+    company_desc text,
+    cost_center text,
+    pred_attr text,
+    attr_prev_cod text,
+    attr_prev_desc text,
+    perimeter text,
+    perimeter_desc text,
+    bus_line_cod1 text,
+    bus_line_desc1 text,
+    bus_line_cod2 text,
+    bus_line_desc2 text,
+    bus_line_cod3 text,
+    bus_line_desc3 text,
+    bus_line_cod4 text,
+    bus_line_desc4 text,
+    bus_line_cod5 text,
+    bus_line_desc5 text,
+    serv_cod1 text,
+    serv_desc1 text,
+    serv_cod2 text,
+    serv_desc2 text,
+    serv_cod3 text,
+    serv_desc3 text,
+    serv_cod4 text,
+    serv_desc4 text,
+    serv_cod5 text,
+    serv_desc5 text,
+    staff_cod1 text,
+    staff_desc1 text,
+    staff_cod2 text,
+    staff_desc2 text,
+    staff_cod3 text,
+    staff_desc3 text,
+    staff_cod4 text,
+    staff_desc4 text,
+    staff_cod5 text,
+    staff_desc5 text,
+    fa_id integer,
+    id_fa character varying(1024),
+    caller character varying(1024),
+    issue_time character varying(1024),
+    expiration_date character varying(1024),
+    status character varying(1024),
+    input_type character varying(1024)
+);
+
+
+--
+-- Name: cleaningtable; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.cleaningtable (
+    clean_id integer NOT NULL,
+    table_name text,
+    table_backup text
+);
+
+
+--
+-- Name: cleaningtable_clean_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.cleaningtable_clean_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: cleaningtable_clean_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.cleaningtable_clean_id_seq OWNED BY afchr_int_schema.cleaningtable.clean_id;
+
+
+--
+-- Name: client; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.client (
+    client_id integer NOT NULL,
+    application text,
+    username text,
+    password text,
+    expiration_date date,
+    enabled integer NOT NULL
+);
+
+
+--
+-- Name: client_client_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.client_client_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: client_client_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.client_client_id_seq OWNED BY afchr_int_schema.client.client_id;
+
+
+--
+-- Name: clientaccess; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.clientaccess (
+    access_id integer NOT NULL,
+    username character varying NOT NULL,
+    access_timestamp timestamp without time zone NOT NULL,
+    access_type character varying NOT NULL,
+    status text,
+    exit_timestamp timestamp without time zone
+);
+
+
+--
+-- Name: clientaccess_access_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.clientaccess_access_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: clientaccess_access_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.clientaccess_access_id_seq OWNED BY afchr_int_schema.clientaccess.access_id;
+
+
+--
+-- Name: companyscope; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.companyscope (
+    record_id integer NOT NULL,
+    afc_new_primo_code text,
+    afc_new_primo_descr text,
+    afc_bl_idis text,
+    afc_bl_igen text,
+    afc_bl_itrd text,
+    afc_bl_iren text,
+    afc_bl_iret text,
+    afc_bl_irel text,
+    afc_bl_iser text,
+    afc_bl_ihol text,
+    afc_bl_inuk text,
+    afc_bl_ieso text,
+    afc_bl_iesl text,
+    afc_bl_prevalent text,
+    afc_area text,
+    afc_perimeter text,
+    afc_perimeter_descr text,
+    afc_country text,
+    afc_country_descr text,
+    afc_company_code text,
+    afc_e4e text,
+    po_sap_global_code text,
+    po_sap_global_descr text,
+    po_new_primo_code text,
+    po_country text,
+    po_country_descr text,
+    cdc_dummy text,
+    flag_consolidation text,
+    update_date timestamp without time zone DEFAULT now(),
+    afc_bl_imob text
+);
+
+
+--
+-- Name: companyscope_record_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.companyscope_record_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: companyscope_record_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.companyscope_record_id_seq OWNED BY afchr_int_schema.companyscope.record_id;
+
+
+--
+-- Name: companyscopebck; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.companyscopebck (
+    record_id integer NOT NULL,
+    afc_new_primo_code text,
+    afc_new_primo_descr text,
+    afc_bl_idis text,
+    afc_bl_igen text,
+    afc_bl_itrd text,
+    afc_bl_iren text,
+    afc_bl_iret text,
+    afc_bl_irel text,
+    afc_bl_iser text,
+    afc_bl_ihol text,
+    afc_bl_inuk text,
+    afc_bl_ieso text,
+    afc_bl_iesl text,
+    afc_bl_prevalent text,
+    afc_area text,
+    afc_perimeter text,
+    afc_perimeter_descr text,
+    afc_country text,
+    afc_country_descr text,
+    afc_company_code text,
+    afc_e4e text,
+    po_sap_global_code text,
+    po_sap_global_descr text,
+    po_new_primo_code text,
+    po_country text,
+    po_country_descr text,
+    cdc_dummy text,
+    flag_consolidation text,
+    update_date timestamp without time zone DEFAULT now(),
+    afc_bl_imob text
+);
+
+
+--
+-- Name: companyscopebck_record_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.companyscopebck_record_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: companyscopebck_record_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.companyscopebck_record_id_seq OWNED BY afchr_int_schema.companyscopebck.record_id;
+
+
+--
+-- Name: constantvalue; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.constantvalue (
+    constant_id integer NOT NULL,
+    enelitalia text,
+    italiaper text,
+    centralperdesc text,
+    italiaperdesc text,
+    enelproduzione text,
+    attr_prev_bs_ml text,
+    gds text,
+    sesec text,
+    dighub text,
+    peo text,
+    chapter text,
+    digfac text,
+    procurement text,
+    communications text,
+    afc text,
+    businesslinecode text,
+    staffcode text,
+    servicecode text,
+    businesslinecodedesc text,
+    staffcodedesc text,
+    servicecodedesc text,
+    ihol text,
+    iser text,
+    bhol text,
+    bser text,
+    gbl text,
+    bhol_bser text,
+    gbl_bhol_bser text,
+    rel text,
+    ret text,
+    esl text,
+    eso text,
+    iret text,
+    iesl text,
+    ieso text,
+    ficticious text,
+    irel text,
+    gco text,
+    smd text,
+    gat text,
+    gbi text,
+    gcc text,
+    gch text,
+    gcr text,
+    gcs text,
+    gfr text,
+    goi text,
+    gpq text,
+    gco_constants text,
+    gco_abbr_constants text
+);
+
+
+--
+-- Name: constantvalue_constant_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.constantvalue_constant_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: constantvalue_constant_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.constantvalue_constant_id_seq OWNED BY afchr_int_schema.constantvalue.constant_id;
+
+
+--
+-- Name: email; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.email (
+    mail text NOT NULL,
+    address_type text NOT NULL,
+    due_date timestamp without time zone NOT NULL
+);
+
+
+--
+-- Name: entity; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.entity (
+    entity_id integer NOT NULL,
+    entity_code text,
+    entity_name text,
+    gbl text
+);
+
+
+--
+-- Name: entity_entity_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.entity_entity_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: entity_entity_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.entity_entity_id_seq OWNED BY afchr_int_schema.entity.entity_id;
+
+
+--
+-- Name: exceptiontable; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.exceptiontable (
+    exception_id integer NOT NULL,
+    tipo_uo text,
+    value_tipo_uo text,
+    gbl_prevalent text,
+    value_gbl_prevalent text,
+    npa text,
+    value_npa text,
+    po_object text,
+    value_po_object text,
+    afc_macroorg1_1 text,
+    value_afc_macroorg1_1 text,
+    afc_macroorg1_2 text,
+    value_afc_macroorg1_2 text,
+    active text DEFAULT 1 NOT NULL
+);
+
+
+--
+-- Name: exceptiontable_20240708; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.exceptiontable_20240708 (
+    exception_id integer,
+    tipo_uo text,
+    value_tipo_uo text,
+    gbl_prevalent text,
+    value_gbl_prevalent text,
+    npa text,
+    value_npa text,
+    po_object text,
+    value_po_object text,
+    afc_macroorg1_1 text,
+    value_afc_macroorg1_1 text,
+    afc_macroorg1_2 text,
+    value_afc_macroorg1_2 text,
+    active text
+);
+
+
+--
+-- Name: exceptiontable_exception_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.exceptiontable_exception_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: exceptiontable_exception_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.exceptiontable_exception_id_seq OWNED BY afchr_int_schema.exceptiontable.exception_id;
+
+
+--
+-- Name: fathertranscoding; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.fathertranscoding (
+    record_id integer NOT NULL,
+    father_code text NOT NULL,
+    gbl_customer text NOT NULL
+);
+
+
+--
+-- Name: fathertranscoding_record_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.fathertranscoding_record_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: fathertranscoding_record_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.fathertranscoding_record_id_seq OWNED BY afchr_int_schema.fathertranscoding.record_id;
+
+
+--
+-- Name: fictcode_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.fictcode_seq
+    START WITH 15375
+    INCREMENT BY 1
+    NO MINVALUE
+    MAXVALUE 999999
+    CACHE 1;
+
+
+--
+-- Name: functionalack; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.functionalack (
+    id_fa integer NOT NULL,
+    caller text,
+    issue_time timestamp without time zone,
+    expiration_date date,
+    status text,
+    input_type text
+);
+
+
+--
+-- Name: functionalack_id_fa_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.functionalack_id_fa_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: functionalack_id_fa_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.functionalack_id_fa_seq OWNED BY afchr_int_schema.functionalack.id_fa;
+
+
+--
+-- Name: hrmasterdataou; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.hrmasterdataou (
+    hrmdou_id integer NOT NULL,
+    u_org text NOT NULL,
+    u_org_desc text,
+    start_date text,
+    end_date text,
+    company text,
+    company_desc text,
+    cost_center text,
+    pred_attr text,
+    pred_attr_desc text,
+    attr_prev_cod text,
+    attr_prev_desc text,
+    perimeter text,
+    perimeter_desc text,
+    bus_line_cod1 text,
+    bus_line_desc1 text,
+    bus_line_cod2 text,
+    bus_line_desc2 text,
+    bus_line_cod3 text,
+    bus_line_desc3 text,
+    bus_line_cod4 text,
+    bus_line_desc4 text,
+    bus_line_cod5 text,
+    bus_line_desc5 text,
+    serv_cod1 text,
+    serv_desc1 text,
+    serv_cod2 text,
+    serv_desc2 text,
+    serv_cod3 text,
+    serv_desc3 text,
+    serv_cod4 text,
+    serv_desc4 text,
+    serv_cod5 text,
+    serv_desc5 text,
+    staff_cod1 text,
+    staff_desc1 text,
+    staff_cod2 text,
+    staff_desc2 text,
+    staff_cod3 text,
+    staff_desc3 text,
+    staff_cod4 text,
+    staff_desc4 text,
+    staff_cod5 text,
+    staff_desc5 text,
+    staff_cod6 text,
+    staff_desc6 text,
+    pred_attr_loc text,
+    pred_attr_desc_loc text,
+    attr_prev_cod_loc text,
+    attr_prev_desc_loc text,
+    perimeter_loc text,
+    perimeter_desc_loc text,
+    bus_line_cod1_loc text,
+    bus_line_desc1_loc text,
+    bus_line_cod2_loc text,
+    bus_line_desc2_loc text,
+    bus_line_cod3_loc text,
+    bus_line_desc3_loc text,
+    bus_line_cod4_loc text,
+    bus_line_desc4_loc text,
+    bus_line_cod5_loc text,
+    bus_line_desc5_loc text,
+    serv_cod1_loc text,
+    serv_desc1_loc text,
+    serv_cod2_loc text,
+    serv_desc2_loc text,
+    serv_cod3_loc text,
+    serv_desc3_loc text,
+    serv_cod4_loc text,
+    serv_desc4_loc text,
+    serv_cod5_loc text,
+    serv_desc5_loc text,
+    staff_cod1_loc text,
+    staff_desc1_loc text,
+    staff_cod2_loc text,
+    staff_desc2_loc text,
+    staff_cod3_loc text,
+    staff_desc3_loc text,
+    staff_cod4_loc text,
+    staff_desc4_loc text,
+    staff_cod5_loc text,
+    staff_desc5_loc text,
+    u_org_cod text,
+    sync_date_time timestamp without time zone,
+    country character varying,
+    num_hc text,
+    typology text
+);
+
+
+--
+-- Name: hrmasterdataou_hrmdou_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.hrmasterdataou_hrmdou_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: hrmasterdataou_hrmdou_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.hrmasterdataou_hrmdou_id_seq OWNED BY afchr_int_schema.hrmasterdataou.hrmdou_id;
+
+
+--
+-- Name: hrmasterdataoubck; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.hrmasterdataoubck (
+    hrmdou_id integer NOT NULL,
+    u_org text NOT NULL,
+    u_org_desc text,
+    start_date text,
+    end_date text,
+    company text,
+    company_desc text,
+    cost_center text,
+    pred_attr text,
+    pred_attr_desc text,
+    attr_prev_cod text,
+    attr_prev_desc text,
+    perimeter text,
+    perimeter_desc text,
+    bus_line_cod1 text,
+    bus_line_desc1 text,
+    bus_line_cod2 text,
+    bus_line_desc2 text,
+    bus_line_cod3 text,
+    bus_line_desc3 text,
+    bus_line_cod4 text,
+    bus_line_desc4 text,
+    bus_line_cod5 text,
+    bus_line_desc5 text,
+    serv_cod1 text,
+    serv_desc1 text,
+    serv_cod2 text,
+    serv_desc2 text,
+    serv_cod3 text,
+    serv_desc3 text,
+    serv_cod4 text,
+    serv_desc4 text,
+    serv_cod5 text,
+    serv_desc5 text,
+    staff_cod1 text,
+    staff_desc1 text,
+    staff_cod2 text,
+    staff_desc2 text,
+    staff_cod3 text,
+    staff_desc3 text,
+    staff_cod4 text,
+    staff_desc4 text,
+    staff_cod5 text,
+    staff_desc5 text,
+    staff_cod6 text,
+    staff_desc6 text,
+    pred_attr_loc text,
+    pred_attr_desc_loc text,
+    attr_prev_cod_loc text,
+    attr_prev_desc_loc text,
+    perimeter_loc text,
+    perimeter_desc_loc text,
+    bus_line_cod1_loc text,
+    bus_line_desc1_loc text,
+    bus_line_cod2_loc text,
+    bus_line_desc2_loc text,
+    bus_line_cod3_loc text,
+    bus_line_desc3_loc text,
+    bus_line_cod4_loc text,
+    bus_line_desc4_loc text,
+    bus_line_cod5_loc text,
+    bus_line_desc5_loc text,
+    serv_cod1_loc text,
+    serv_desc1_loc text,
+    serv_cod2_loc text,
+    serv_desc2_loc text,
+    serv_cod3_loc text,
+    serv_desc3_loc text,
+    serv_cod4_loc text,
+    serv_desc4_loc text,
+    serv_cod5_loc text,
+    serv_desc5_loc text,
+    staff_cod1_loc text,
+    staff_desc1_loc text,
+    staff_cod2_loc text,
+    staff_desc2_loc text,
+    staff_cod3_loc text,
+    staff_desc3_loc text,
+    staff_cod4_loc text,
+    staff_desc4_loc text,
+    staff_cod5_loc text,
+    staff_desc5_loc text,
+    u_org_cod text,
+    sync_date_time timestamp without time zone,
+    country character varying,
+    num_hc text,
+    typology text
+);
+
+
+--
+-- Name: hrmasterdataoubck_hrmdou_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.hrmasterdataoubck_hrmdou_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: hrmasterdataoubck_hrmdou_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.hrmasterdataoubck_hrmdou_id_seq OWNED BY afchr_int_schema.hrmasterdataoubck.hrmdou_id;
+
+
+--
+-- Name: hrou; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.hrou (
+    hrmdou_id integer NOT NULL,
+    u_org text NOT NULL,
+    u_org_desc text,
+    start_date text,
+    end_date text,
+    company text,
+    company_desc text,
+    cost_center text,
+    pred_attr text,
+    pred_attr_desc text,
+    attr_prev_cod text,
+    attr_prev_desc text,
+    perimeter text,
+    perimeter_desc text,
+    bus_line_cod1 text,
+    bus_line_desc1 text,
+    bus_line_cod2 text,
+    bus_line_desc2 text,
+    bus_line_cod3 text,
+    bus_line_desc3 text,
+    bus_line_cod4 text,
+    bus_line_desc4 text,
+    bus_line_cod5 text,
+    bus_line_desc5 text,
+    serv_cod1 text,
+    serv_desc1 text,
+    serv_cod2 text,
+    serv_desc2 text,
+    serv_cod3 text,
+    serv_desc3 text,
+    serv_cod4 text,
+    serv_desc4 text,
+    serv_cod5 text,
+    serv_desc5 text,
+    staff_cod1 text,
+    staff_desc1 text,
+    staff_cod2 text,
+    staff_desc2 text,
+    staff_cod3 text,
+    staff_desc3 text,
+    staff_cod4 text,
+    staff_desc4 text,
+    staff_cod5 text,
+    staff_desc5 text,
+    pred_attr_loc text,
+    pred_attr_desc_loc text,
+    attr_prev_cod_loc text,
+    attr_prev_desc_loc text,
+    perimeter_loc text,
+    perimeter_desc_loc text,
+    bus_line_cod1_loc text,
+    bus_line_desc1_loc text,
+    bus_line_cod2_loc text,
+    bus_line_desc2_loc text,
+    bus_line_cod3_loc text,
+    bus_line_desc3_loc text,
+    bus_line_cod4_loc text,
+    bus_line_desc4_loc text,
+    bus_line_cod5_loc text,
+    bus_line_desc5_loc text,
+    serv_cod1_loc text,
+    serv_desc1_loc text,
+    serv_cod2_loc text,
+    serv_desc2_loc text,
+    serv_cod3_loc text,
+    serv_desc3_loc text,
+    serv_cod4_loc text,
+    serv_desc4_loc text,
+    serv_cod5_loc text,
+    serv_desc5_loc text,
+    staff_cod1_loc text,
+    staff_desc1_loc text,
+    staff_cod2_loc text,
+    staff_desc2_loc text,
+    staff_cod3_loc text,
+    staff_desc3_loc text,
+    staff_cod4_loc text,
+    staff_desc4_loc text,
+    staff_cod5_loc text,
+    staff_desc5_loc text,
+    u_org_cod text,
+    sync_date_time timestamp without time zone,
+    country character varying,
+    num_hc text,
+    typology_association text,
+    total_cost_centers integer
+);
+
+
+--
+-- Name: hrou_hrmdou_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.hrou_hrmdou_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: hrou_hrmdou_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.hrou_hrmdou_id_seq OWNED BY afchr_int_schema.hrou.hrmdou_id;
+
+
+--
+-- Name: hroubck; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.hroubck (
+    hrmdou_id integer NOT NULL,
+    u_org text NOT NULL,
+    u_org_desc text,
+    start_date text,
+    end_date text,
+    company text,
+    company_desc text,
+    cost_center text,
+    pred_attr text,
+    pred_attr_desc text,
+    attr_prev_cod text,
+    attr_prev_desc text,
+    perimeter text,
+    perimeter_desc text,
+    bus_line_cod1 text,
+    bus_line_desc1 text,
+    bus_line_cod2 text,
+    bus_line_desc2 text,
+    bus_line_cod3 text,
+    bus_line_desc3 text,
+    bus_line_cod4 text,
+    bus_line_desc4 text,
+    bus_line_cod5 text,
+    bus_line_desc5 text,
+    serv_cod1 text,
+    serv_desc1 text,
+    serv_cod2 text,
+    serv_desc2 text,
+    serv_cod3 text,
+    serv_desc3 text,
+    serv_cod4 text,
+    serv_desc4 text,
+    serv_cod5 text,
+    serv_desc5 text,
+    staff_cod1 text,
+    staff_desc1 text,
+    staff_cod2 text,
+    staff_desc2 text,
+    staff_cod3 text,
+    staff_desc3 text,
+    staff_cod4 text,
+    staff_desc4 text,
+    staff_cod5 text,
+    staff_desc5 text,
+    pred_attr_loc text,
+    pred_attr_desc_loc text,
+    attr_prev_cod_loc text,
+    attr_prev_desc_loc text,
+    perimeter_loc text,
+    perimeter_desc_loc text,
+    bus_line_cod1_loc text,
+    bus_line_desc1_loc text,
+    bus_line_cod2_loc text,
+    bus_line_desc2_loc text,
+    bus_line_cod3_loc text,
+    bus_line_desc3_loc text,
+    bus_line_cod4_loc text,
+    bus_line_desc4_loc text,
+    bus_line_cod5_loc text,
+    bus_line_desc5_loc text,
+    serv_cod1_loc text,
+    serv_desc1_loc text,
+    serv_cod2_loc text,
+    serv_desc2_loc text,
+    serv_cod3_loc text,
+    serv_desc3_loc text,
+    serv_cod4_loc text,
+    serv_desc4_loc text,
+    serv_cod5_loc text,
+    serv_desc5_loc text,
+    staff_cod1_loc text,
+    staff_desc1_loc text,
+    staff_cod2_loc text,
+    staff_desc2_loc text,
+    staff_cod3_loc text,
+    staff_desc3_loc text,
+    staff_cod4_loc text,
+    staff_desc4_loc text,
+    staff_cod5_loc text,
+    staff_desc5_loc text,
+    u_org_cod text,
+    sync_date_time timestamp without time zone,
+    country character varying,
+    num_hc text,
+    typology_association text,
+    total_cost_centers integer
+);
+
+
+--
+-- Name: hroubck_hrmdou_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.hroubck_hrmdou_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: hroubck_hrmdou_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.hroubck_hrmdou_id_seq OWNED BY afchr_int_schema.hroubck.hrmdou_id;
+
+
+--
+-- Name: hrschedulerconfiguration; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.hrschedulerconfiguration (
+    scheduler_config_id integer NOT NULL,
+    days_denied text,
+    hours_permitted text,
+    minute_permitted text,
+    min_interval text,
+    hrsync_type text,
+    hrsync_type_desc text,
+    config_args_request text,
+    config_args_request_desc text,
+    config_args_request_guide text,
+    active integer,
+    flag_sync text,
+    sync_post_service text
+);
+
+
+--
+-- Name: hrschedulerconfiguration_scheduler_config_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.hrschedulerconfiguration_scheduler_config_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: hrschedulerconfiguration_scheduler_config_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.hrschedulerconfiguration_scheduler_config_id_seq OWNED BY afchr_int_schema.hrschedulerconfiguration.scheduler_config_id;
+
+
+--
+-- Name: itaglo; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.itaglo (
+    ita_glo_id integer NOT NULL,
+    sap_hr_global_code text,
+    is_enel_italia text
+);
+
+
+--
+-- Name: itaglo_ita_glo_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.itaglo_ita_glo_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: itaglo_ita_glo_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.itaglo_ita_glo_id_seq OWNED BY afchr_int_schema.itaglo.ita_glo_id;
+
+
+--
+-- Name: report; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.report (
+    report_id integer NOT NULL,
+    date_time timestamp without time zone NOT NULL,
+    message text,
+    changed_found text,
+    dummy_found text,
+    nocc_found text,
+    saved text
+);
+
+
+--
+-- Name: report_report_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.report_report_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: report_report_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.report_report_id_seq OWNED BY afchr_int_schema.report.report_id;
+
+
+--
+-- Name: responsability; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.responsability (
+    responsability_id integer NOT NULL,
+    responsability_code text,
+    new_primo_code text,
+    societa text
+);
+
+
+--
+-- Name: responsability_responsability_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.responsability_responsability_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: responsability_responsability_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.responsability_responsability_id_seq OWNED BY afchr_int_schema.responsability.responsability_id;
+
+
+--
+-- Name: responsabilitybck; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.responsabilitybck (
+    responsability_id integer NOT NULL,
+    responsability_code text,
+    new_primo_code text,
+    societa text
+);
+
+
+--
+-- Name: responsabilitybck_responsability_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.responsabilitybck_responsability_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: responsabilitybck_responsability_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.responsabilitybck_responsability_id_seq OWNED BY afchr_int_schema.responsabilitybck.responsability_id;
+
+
+--
+-- Name: result; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.result (
+    result_id integer NOT NULL,
+    system_id text,
+    relationship_start_date text,
+    organizational_unit_code text,
+    legal_entity text,
+    cost_center_description text,
+    company_code text,
+    cost_center_type text,
+    state text,
+    typology text,
+    association_time timestamp without time zone,
+    sync_date_time timestamp without time zone,
+    cost_center_code text,
+    macro_org1 text,
+    macro_org2 text,
+    vcs text,
+    process text,
+    organization text,
+    hr_organizational_unit_code text,
+    new_primo_code text,
+    country text,
+    company_description text,
+    task_number text
+);
+
+
+--
+-- Name: result_result_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.result_result_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: result_result_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.result_result_id_seq OWNED BY afchr_int_schema.result.result_id;
+
+
+--
+-- Name: schedulerconfiguration; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.schedulerconfiguration (
+    sched_config_id integer NOT NULL,
+    day_of_month integer NOT NULL,
+    time_of_day integer NOT NULL,
+    interval_in_minutes integer,
+    scheduler_name text,
+    active smallint,
+    flag_sync text,
+    sync_post_service text
+);
+
+
+--
+-- Name: schedulerconfiguration_sched_config_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.schedulerconfiguration_sched_config_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: schedulerconfiguration_sched_config_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.schedulerconfiguration_sched_config_id_seq OWNED BY afchr_int_schema.schedulerconfiguration.sched_config_id;
+
+
+--
+-- Name: typologytranscoding; Type: TABLE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE TABLE afchr_int_schema.typologytranscoding (
+    record_id integer NOT NULL,
+    snow_code text NOT NULL,
+    parent_name text NOT NULL,
+    attribute_name text NOT NULL
+);
+
+
+--
+-- Name: typologytranscoding_record_id_seq; Type: SEQUENCE; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE SEQUENCE afchr_int_schema.typologytranscoding_record_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: typologytranscoding_record_id_seq; Type: SEQUENCE OWNED BY; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER SEQUENCE afchr_int_schema.typologytranscoding_record_id_seq OWNED BY afchr_int_schema.typologytranscoding.record_id;
+
+
+--
+-- Name: activityassociation record_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.activityassociation ALTER COLUMN record_id SET DEFAULT nextval('afchr_int_schema.activityassociation_record_id_seq'::regclass);
+
+
+--
+-- Name: activityassociationbck record_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.activityassociationbck ALTER COLUMN record_id SET DEFAULT nextval('afchr_int_schema.activityassociationbck_record_id_seq'::regclass);
+
+
+--
+-- Name: associationcostcenter association_cost_center_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.associationcostcenter ALTER COLUMN association_cost_center_id SET DEFAULT nextval('afchr_int_schema.associationcostcenter_association_cost_center_id_seq'::regclass);
+
+
+--
+-- Name: associationorganizationunit organization_unit_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.associationorganizationunit ALTER COLUMN organization_unit_id SET DEFAULT nextval('afchr_int_schema.associationorganizationunit_organization_unit_id_seq'::regclass);
+
+
+--
+-- Name: bwcc association_cost_center_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.bwcc ALTER COLUMN association_cost_center_id SET DEFAULT nextval('afchr_int_schema.bwcc_association_cost_center_id_seq'::regclass);
+
+
+--
+-- Name: bwccbck association_cost_center_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.bwccbck ALTER COLUMN association_cost_center_id SET DEFAULT nextval('afchr_int_schema.bwccbck_association_cost_center_id_seq'::regclass);
+
+
+--
+-- Name: cleanbwcc association_cost_center_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.cleanbwcc ALTER COLUMN association_cost_center_id SET DEFAULT nextval('afchr_int_schema.cleanbwcc_association_cost_center_id_seq'::regclass);
+
+
+--
+-- Name: cleanhrou hrmdou_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.cleanhrou ALTER COLUMN hrmdou_id SET DEFAULT nextval('afchr_int_schema.cleanhrou_hrmdou_id_seq'::regclass);
+
+
+--
+-- Name: cleaningtable clean_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.cleaningtable ALTER COLUMN clean_id SET DEFAULT nextval('afchr_int_schema.cleaningtable_clean_id_seq'::regclass);
+
+
+--
+-- Name: client client_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.client ALTER COLUMN client_id SET DEFAULT nextval('afchr_int_schema.client_client_id_seq'::regclass);
+
+
+--
+-- Name: clientaccess access_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.clientaccess ALTER COLUMN access_id SET DEFAULT nextval('afchr_int_schema.clientaccess_access_id_seq'::regclass);
+
+
+--
+-- Name: companyscope record_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.companyscope ALTER COLUMN record_id SET DEFAULT nextval('afchr_int_schema.companyscope_record_id_seq'::regclass);
+
+
+--
+-- Name: companyscopebck record_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.companyscopebck ALTER COLUMN record_id SET DEFAULT nextval('afchr_int_schema.companyscopebck_record_id_seq'::regclass);
+
+
+--
+-- Name: constantvalue constant_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.constantvalue ALTER COLUMN constant_id SET DEFAULT nextval('afchr_int_schema.constantvalue_constant_id_seq'::regclass);
+
+
+--
+-- Name: entity entity_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.entity ALTER COLUMN entity_id SET DEFAULT nextval('afchr_int_schema.entity_entity_id_seq'::regclass);
+
+
+--
+-- Name: exceptiontable exception_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.exceptiontable ALTER COLUMN exception_id SET DEFAULT nextval('afchr_int_schema.exceptiontable_exception_id_seq'::regclass);
+
+
+--
+-- Name: fathertranscoding record_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.fathertranscoding ALTER COLUMN record_id SET DEFAULT nextval('afchr_int_schema.fathertranscoding_record_id_seq'::regclass);
+
+
+--
+-- Name: functionalack id_fa; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.functionalack ALTER COLUMN id_fa SET DEFAULT nextval('afchr_int_schema.functionalack_id_fa_seq'::regclass);
+
+
+--
+-- Name: hrmasterdataou hrmdou_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.hrmasterdataou ALTER COLUMN hrmdou_id SET DEFAULT nextval('afchr_int_schema.hrmasterdataou_hrmdou_id_seq'::regclass);
+
+
+--
+-- Name: hrmasterdataoubck hrmdou_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.hrmasterdataoubck ALTER COLUMN hrmdou_id SET DEFAULT nextval('afchr_int_schema.hrmasterdataoubck_hrmdou_id_seq'::regclass);
+
+
+--
+-- Name: hrou hrmdou_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.hrou ALTER COLUMN hrmdou_id SET DEFAULT nextval('afchr_int_schema.hrou_hrmdou_id_seq'::regclass);
+
+
+--
+-- Name: hroubck hrmdou_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.hroubck ALTER COLUMN hrmdou_id SET DEFAULT nextval('afchr_int_schema.hroubck_hrmdou_id_seq'::regclass);
+
+
+--
+-- Name: hrschedulerconfiguration scheduler_config_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.hrschedulerconfiguration ALTER COLUMN scheduler_config_id SET DEFAULT nextval('afchr_int_schema.hrschedulerconfiguration_scheduler_config_id_seq'::regclass);
+
+
+--
+-- Name: itaglo ita_glo_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.itaglo ALTER COLUMN ita_glo_id SET DEFAULT nextval('afchr_int_schema.itaglo_ita_glo_id_seq'::regclass);
+
+
+--
+-- Name: report report_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.report ALTER COLUMN report_id SET DEFAULT nextval('afchr_int_schema.report_report_id_seq'::regclass);
+
+
+--
+-- Name: responsability responsability_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.responsability ALTER COLUMN responsability_id SET DEFAULT nextval('afchr_int_schema.responsability_responsability_id_seq'::regclass);
+
+
+--
+-- Name: responsabilitybck responsability_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.responsabilitybck ALTER COLUMN responsability_id SET DEFAULT nextval('afchr_int_schema.responsabilitybck_responsability_id_seq'::regclass);
+
+
+--
+-- Name: result result_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.result ALTER COLUMN result_id SET DEFAULT nextval('afchr_int_schema.result_result_id_seq'::regclass);
+
+
+--
+-- Name: schedulerconfiguration sched_config_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.schedulerconfiguration ALTER COLUMN sched_config_id SET DEFAULT nextval('afchr_int_schema.schedulerconfiguration_sched_config_id_seq'::regclass);
+
+
+--
+-- Name: typologytranscoding record_id; Type: DEFAULT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.typologytranscoding ALTER COLUMN record_id SET DEFAULT nextval('afchr_int_schema.typologytranscoding_record_id_seq'::regclass);
+
+
+--
+-- Name: associationcostcenter PK_associationcostcenter; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.associationcostcenter
+    ADD CONSTRAINT "PK_associationcostcenter" PRIMARY KEY (association_cost_center_id);
+
+
+--
+-- Name: associationorganizationunit PK_associationorganizationunit; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.associationorganizationunit
+    ADD CONSTRAINT "PK_associationorganizationunit" PRIMARY KEY (organization_unit_id);
+
+
+--
+-- Name: cleanbwcc PK_cleanbwcc; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.cleanbwcc
+    ADD CONSTRAINT "PK_cleanbwcc" PRIMARY KEY (association_cost_center_id);
+
+
+--
+-- Name: companyscope PK_companyscope; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.companyscope
+    ADD CONSTRAINT "PK_companyscope" PRIMARY KEY (record_id);
+
+
+--
+-- Name: companyscopebck PK_companyscopebck; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.companyscopebck
+    ADD CONSTRAINT "PK_companyscopebck" PRIMARY KEY (record_id);
+
+
+--
+-- Name: constantvalue PK_constant; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.constantvalue
+    ADD CONSTRAINT "PK_constant" PRIMARY KEY (constant_id);
+
+
+--
+-- Name: exceptiontable PK_eexception; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.exceptiontable
+    ADD CONSTRAINT "PK_eexception" PRIMARY KEY (exception_id);
+
+
+--
+-- Name: entity PK_entity; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.entity
+    ADD CONSTRAINT "PK_entity" PRIMARY KEY (entity_id);
+
+
+--
+-- Name: functionalack PK_functionalack; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.functionalack
+    ADD CONSTRAINT "PK_functionalack" PRIMARY KEY (id_fa);
+
+
+--
+-- Name: hrmasterdataou PK_hrmasterdataou; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.hrmasterdataou
+    ADD CONSTRAINT "PK_hrmasterdataou" PRIMARY KEY (hrmdou_id);
+
+
+--
+-- Name: hrmasterdataoubck PK_hrmasterdataoubck; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.hrmasterdataoubck
+    ADD CONSTRAINT "PK_hrmasterdataoubck" PRIMARY KEY (hrmdou_id);
+
+
+--
+-- Name: cleanhrou PK_hrmasterdataouexcel; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.cleanhrou
+    ADD CONSTRAINT "PK_hrmasterdataouexcel" PRIMARY KEY (hrmdou_id);
+
+
+--
+-- Name: hrou PK_hrou; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.hrou
+    ADD CONSTRAINT "PK_hrou" PRIMARY KEY (hrmdou_id);
+
+
+--
+-- Name: hroubck PK_hroubck; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.hroubck
+    ADD CONSTRAINT "PK_hroubck" PRIMARY KEY (hrmdou_id);
+
+
+--
+-- Name: hrschedulerconfiguration PK_hrschedulerconfiguration; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.hrschedulerconfiguration
+    ADD CONSTRAINT "PK_hrschedulerconfiguration" PRIMARY KEY (scheduler_config_id);
+
+
+--
+-- Name: itaglo PK_itaglo; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.itaglo
+    ADD CONSTRAINT "PK_itaglo" PRIMARY KEY (ita_glo_id);
+
+
+--
+-- Name: report PK_report; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.report
+    ADD CONSTRAINT "PK_report" PRIMARY KEY (report_id);
+
+
+--
+-- Name: responsability PK_resp; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.responsability
+    ADD CONSTRAINT "PK_resp" PRIMARY KEY (responsability_id);
+
+
+--
+-- Name: responsabilitybck PK_respbck; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.responsabilitybck
+    ADD CONSTRAINT "PK_respbck" PRIMARY KEY (responsability_id);
+
+
+--
+-- Name: schedulerconfiguration PK_schedulerconfiguration; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.schedulerconfiguration
+    ADD CONSTRAINT "PK_schedulerconfiguration" PRIMARY KEY (sched_config_id);
+
+
+--
+-- Name: cleaningtable clean_pk; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.cleaningtable
+    ADD CONSTRAINT clean_pk PRIMARY KEY (clean_id);
+
+
+--
+-- Name: client client_pk; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.client
+    ADD CONSTRAINT client_pk PRIMARY KEY (client_id);
+
+
+--
+-- Name: email email_pk; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.email
+    ADD CONSTRAINT email_pk PRIMARY KEY (mail, address_type, due_date);
+
+
+--
+-- Name: fathertranscoding fathertranscoding_pk; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.fathertranscoding
+    ADD CONSTRAINT fathertranscoding_pk PRIMARY KEY (record_id);
+
+
+--
+-- Name: fathertranscoding fathertranscoding_un; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.fathertranscoding
+    ADD CONSTRAINT fathertranscoding_un UNIQUE (father_code, gbl_customer);
+
+
+--
+-- Name: typologytranscoding typologytranscoding_pk; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.typologytranscoding
+    ADD CONSTRAINT typologytranscoding_pk PRIMARY KEY (record_id);
+
+
+--
+-- Name: typologytranscoding typologytranscoding_un; Type: CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.typologytranscoding
+    ADD CONSTRAINT typologytranscoding_un UNIQUE (snow_code, parent_name);
+
+
+--
+-- Name: cleanbwcc_fa_id_idx; Type: INDEX; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE INDEX cleanbwcc_fa_id_idx ON afchr_int_schema.cleanbwcc USING btree (fa_id);
+
+
+--
+-- Name: cleanhrou_fa_id_idx; Type: INDEX; Schema: afchr_int_schema; Owner: -
+--
+
+CREATE INDEX cleanhrou_fa_id_idx ON afchr_int_schema.cleanhrou USING btree (fa_id);
+
+
+--
+-- Name: cleanbwcc cleanbwcc_cleanhrou_fk; Type: FK CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.cleanbwcc
+    ADD CONSTRAINT cleanbwcc_cleanhrou_fk FOREIGN KEY (organization_unit_id) REFERENCES afchr_int_schema.cleanhrou(hrmdou_id);
+
+
+--
+-- Name: cleanbwcc cleanbwcc_functionalack_fk; Type: FK CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.cleanbwcc
+    ADD CONSTRAINT cleanbwcc_functionalack_fk FOREIGN KEY (fa_id) REFERENCES afchr_int_schema.functionalack(id_fa) ON DELETE CASCADE;
+
+
+--
+-- Name: cleanhrou cleanhrou_functionalack_fk; Type: FK CONSTRAINT; Schema: afchr_int_schema; Owner: -
+--
+
+ALTER TABLE ONLY afchr_int_schema.cleanhrou
+    ADD CONSTRAINT cleanhrou_functionalack_fk FOREIGN KEY (fa_id) REFERENCES afchr_int_schema.functionalack(id_fa) ON DELETE CASCADE DEFERRABLE;
+
+
+--
+-- PostgreSQL database dump complete
+--
+
+\unrestrict XHKZsCyUBnFvIg7lhQsDCaXv637I9sZ8u10aFAMGQKsxjVWJmwrUZi1Qx6f6szV
+
